@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>OROZCO Tip Calculator</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+      :root {
+        --cyan: #00f5ff;
+        --blue: #0070ff;
+        --violet: #7b2fff;
+        --bg: #050a18;
+        --text: #e8f4ff;
+        --glass-bg: rgba(0,180,255,0.05);
+        --glass-border: rgba(0,245,255,0.18);
+      }
+
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Rajdhani', -apple-system, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      .circuit-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        opacity: 0.04;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cdefs%3E%3Cpattern id='c' patternUnits='userSpaceOnUse' width='50' height='50'%3E%3Cpath d='M0 25h20M25 0v20M30 25h20M25 30v20' stroke='%2300f5ff' stroke-width='.7' fill='none'/%3E%3Ccircle cx='25' cy='25' r='2' fill='%2300f5ff'/%3E%3Ccircle cx='0' cy='25' r='1' fill='%2300f5ff'/%3E%3Ccircle cx='50' cy='25' r='1' fill='%2300f5ff'/%3E%3Ccircle cx='25' cy='0' r='1' fill='%2300f5ff'/%3E%3Ccircle cx='25' cy='50' r='1' fill='%2300f5ff'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='200' height='200' fill='url(%23c)'/%3E%3C/svg%3E");
+        animation: circuitDrift 20s linear infinite;
+      }
+      @keyframes circuitDrift {
+        0% { background-position: 0 0; }
+        100% { background-position: 200px 200px; }
+      }
+
+      .particle {
+        position: fixed;
+        width: 3px;
+        height: 3px;
+        background: var(--cyan);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0;
+        box-shadow: 0 0 6px var(--cyan);
+        animation: particleFloat linear infinite;
+      }
+      @keyframes particleFloat {
+        0% { transform: translateY(0); opacity: 0; }
+        10% { opacity: 0.6; }
+        90% { opacity: 0.3; }
+        100% { transform: translateY(-100vh); opacity: 0; }
+      }
+
+      .glass {
+        background: var(--glass-bg);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+      }
+
+      @keyframes orbPulse {
+        0%, 100% { transform: scale(1); opacity: 0.8; filter: drop-shadow(0 0 12px var(--cyan)); }
+        50% { transform: scale(1.08); opacity: 1; filter: drop-shadow(0 0 24px var(--cyan)) drop-shadow(0 0 40px var(--blue)); }
+      }
+      @keyframes orbRing {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes scanLine {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100%); }
+      }
+      .scan-overlay {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border-radius: 16px;
+        pointer-events: none;
+      }
+      .scan-line {
+        position: absolute;
+        left: 0; right: 0;
+        height: 40px;
+        background: linear-gradient(180deg, transparent, rgba(0,245,255,0.12), transparent);
+        animation: scanLine 3s ease-in-out infinite;
+      }
+      @keyframes keyPress {
+        0% { transform: scale(1); }
+        50% { transform: scale(0.88); box-shadow: 0 0 20px rgba(0,245,255,0.6); }
+        100% { transform: scale(1); }
+      }
+      .key-flash { animation: keyPress 0.18s ease-out; }
+
+      @keyframes idleGlow {
+        0%, 100% { box-shadow: 0 0 6px rgba(0,245,255,0.15); }
+        50% { box-shadow: 0 0 14px rgba(0,245,255,0.3); }
+      }
+
+      .value-display { transition: text-shadow 0.3s ease; }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, rgba(0,245,255,0.2), rgba(0,245,255,0.4));
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: var(--cyan);
+        cursor: pointer;
+        box-shadow: 0 0 12px var(--cyan), 0 0 24px rgba(0,245,255,0.4);
+      }
+
+      .app-container {
+        width: 100%;
+        max-width: 430px;
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      .app-container::-webkit-scrollbar { display: none; }
+
+      /* Typography */
+      .font-orbitron { font-family: 'Orbitron', -apple-system, monospace; }
+      .font-rajdhani { font-family: 'Rajdhani', -apple-system, sans-serif; }
+
+      /* Header */
+      header { text-align: center; padding: 8px 0 6px; flex-shrink: 0; }
+      .orb-wrap { position: relative; width: 52px; height: 52px; margin: 0 auto 4px; }
+      .orb-ring { position: absolute; top: 0; left: 0; animation: orbRing 6s linear infinite; }
+      .orb-core { animation: orbPulse 2.5s ease-in-out infinite; }
+      h1 {
+        font-family: 'Orbitron', monospace;
+        font-size: 28px; font-weight: 700;
+        color: var(--cyan);
+        text-shadow: 0 0 20px rgba(0,245,255,0.6), 0 0 40px rgba(0,245,255,0.3);
+        letter-spacing: 0.05em;
+      }
+      .subtitle {
+        font-family: 'Orbitron', monospace;
+        font-size: 10px; letter-spacing: 0.35em;
+        color: var(--cyan); opacity: 0.7; margin-top: 2px;
+      }
+
+      /* Section labels */
+      .section-label {
+        font-family: 'Orbitron', monospace;
+        font-size: 10px; letter-spacing: 0.2em;
+        color: var(--cyan); margin-bottom: 6px; margin-left: 4px;
+        display: block;
+      }
+
+      /* Bill display */
+      .bill-section { margin-bottom: 8px; flex-shrink: 0; }
+      .bill-box {
+        border-radius: 16px; padding: 10px 12px;
+        margin-bottom: 8px; position: relative;
+      }
+      #bill-display {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 52px; font-weight: 700; line-height: 1.1;
+        text-align: center;
+        color: var(--text);
+        text-shadow: 0 0 12px rgba(0,245,255,0.3);
+      }
+
+      /* Keypad */
+      .keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .numkey {
+        height: 52px; border-radius: 14px;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        color: var(--text);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 20px; font-weight: 600;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        animation: idleGlow 3s ease-in-out infinite;
+        transition: all 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .numkey:active {
+        transform: scale(0.9);
+        box-shadow: 0 0 20px rgba(0,245,255,0.6);
+      }
+
+      /* Tip buttons */
+      .tip-section { margin-bottom: 8px; flex-shrink: 0; }
+      .tip-row { display: flex; gap: 6px; margin-bottom: 8px; }
+      .tip-btn {
+        flex: 1; padding: 8px 0;
+        border-radius: 24px;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        color: var(--text);
+        font-family: 'Orbitron', monospace;
+        font-size: 11px; font-weight: 600;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        animation: idleGlow 2.5s ease-in-out infinite;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .tip-btn.active {
+        background: linear-gradient(135deg, var(--cyan), var(--blue));
+        color: #fff;
+        box-shadow: 0 0 20px rgba(0,245,255,0.5), 0 0 40px rgba(0,245,255,0.2);
+        border-color: transparent;
+        animation: none;
+      }
+      .custom-row { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+      #custom-toggle {
+        font-family: 'Orbitron', monospace;
+        font-size: 10px; letter-spacing: 0.15em;
+        color: var(--cyan);
+        border: 1px solid rgba(0,245,255,0.25);
+        border-radius: 20px;
+        background: rgba(0,245,255,0.05);
+        padding: 6px 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #custom-slider-wrap {
+        flex: 1; display: none; align-items: center; gap: 8px;
+      }
+      #custom-slider-wrap.visible { display: flex; }
+      #custom-val {
+        font-family: 'Orbitron', monospace;
+        font-size: 13px; font-weight: 700;
+        color: var(--cyan); min-width: 36px; text-align: right;
+      }
+
+      /* Split */
+      .split-section { margin-bottom: 8px; flex-shrink: 0; }
+      .split-row { display: flex; align-items: center; justify-content: center; gap: 20px; }
+      .split-btn {
+        width: 46px; height: 46px; border-radius: 50%;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        animation: idleGlow 2.5s ease-in-out infinite;
+        transition: all 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .split-btn:active { transform: scale(0.9); box-shadow: 0 0 18px rgba(0,245,255,0.5); }
+      .split-btn svg { width: 20px; height: 20px; stroke: var(--cyan); stroke-width: 2; fill: none; }
+      .split-center { text-align: center; min-width: 90px; }
+      #split-display {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 30px; font-weight: 700; color: var(--text);
+      }
+      #split-label {
+        font-family: 'Orbitron', monospace;
+        font-size: 10px; letter-spacing: 0.2em;
+        color: rgba(0,245,255,0.6); margin-left: 6px;
+      }
+
+      /* Results */
+      .results-section {
+        margin-bottom: 8px; flex-shrink: 0;
+        padding: 14px 16px;
+        border: 1px solid rgba(0,245,255,0.28);
+        box-shadow: 0 0 30px rgba(0,245,255,0.08), 0 0 60px rgba(0,112,255,0.05);
+        border-radius: 20px;
+        background: var(--glass-bg);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
+      }
+      .result-orb { display: flex; justify-content: center; margin-bottom: 8px; }
+      .result-label {
+        font-family: 'Orbitron', monospace;
+        font-size: 9px; letter-spacing: 0.25em;
+        margin-bottom: 2px; display: block; text-align: center;
+      }
+      .result-value {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700; text-align: center;
+      }
+      .neon-divider {
+        height: 1px; margin: 8px 0;
+        background: linear-gradient(90deg, transparent, rgba(0,245,255,0.3), rgba(123,47,255,0.2), transparent);
+      }
+
+      /* Reset */
+      #reset-btn {
+        width: 100%; padding: 12px 0;
+        border-radius: 28px;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        color: var(--cyan);
+        font-family: 'Orbitron', monospace;
+        font-size: 13px; font-weight: 700; letter-spacing: 0.2em;
+        cursor: pointer;
+        margin-bottom: 8px; flex-shrink: 0;
+        animation: idleGlow 2.5s ease-in-out infinite;
+        transition: all 0.25s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #reset-btn:active {
+        background: linear-gradient(135deg, var(--cyan), var(--blue));
+        color: #fff;
+        box-shadow: 0 0 24px rgba(0,245,255,0.5);
+      }
+
+      footer { text-align: center; padding: 4px 0; flex-shrink: 0; }
+      .footer-text {
+        font-family: 'Orbitron', monospace;
+        font-size: 8px; letter-spacing: 0.2em;
+        color: rgba(0,245,255,0.25);
+      }
+    </style>
+</head>
+<body>
+  <div class="circuit-bg"></div>
+  <div class="particle" style="left:10%;animation-duration:8s;animation-delay:0s;width:2px;height:2px;"></div>
+  <div class="particle" style="left:25%;animation-duration:11s;animation-delay:1s;"></div>
+  <div class="particle" style="left:50%;animation-duration:9s;animation-delay:2s;width:2px;height:2px;"></div>
+  <div class="particle" style="left:70%;animation-duration:13s;animation-delay:0.5s;"></div>
+  <div class="particle" style="left:85%;animation-duration:10s;animation-delay:3s;width:2px;height:2px;"></div>
+  <div class="particle" style="left:40%;animation-duration:12s;animation-delay:4s;"></div>
+  <div class="particle" style="left:60%;animation-duration:7s;animation-delay:1.5s;width:2px;height:2px;"></div>
+
+  <div class="app-container" style="padding: 0 16px;">
+
+    <header>
+      <div class="orb-wrap">
+        <svg class="orb-core" width="52" height="52" viewBox="0 0 52 52">
+          <defs>
+            <radialGradient id="og" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#00f5ff" stop-opacity="1"/>
+              <stop offset="50%" stop-color="#0070ff" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#7b2fff" stop-opacity="0.2"/>
+            </radialGradient>
+          </defs>
+          <circle cx="26" cy="26" r="14" fill="url(#og)"/>
+          <circle cx="26" cy="26" r="14" fill="none" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+        </svg>
+        <svg class="orb-ring" width="52" height="52" viewBox="0 0 52 52">
+          <ellipse cx="26" cy="26" rx="22" ry="8" fill="none" stroke="rgba(0,245,255,0.25)" stroke-width="0.8" stroke-dasharray="4 3"/>
+        </svg>
+      </div>
+      <h1>OROZCO</h1>
+      <p class="subtitle">TIP CALCULATOR</p>
+    </header>
+
+    <!-- Bill -->
+    <div class="bill-section">
+      <span class="section-label">BILL AMOUNT</span>
+      <div class="bill-box glass">
+        <div class="scan-overlay"><div class="scan-line"></div></div>
+        <div id="bill-display">$0.00</div>
+      </div>
+      <div class="keypad">
+        <button class="numkey" data-key="1">1</button>
+        <button class="numkey" data-key="2">2</button>
+        <button class="numkey" data-key="3">3</button>
+        <button class="numkey" data-key="4">4</button>
+        <button class="numkey" data-key="5">5</button>
+        <button class="numkey" data-key="6">6</button>
+        <button class="numkey" data-key="7">7</button>
+        <button class="numkey" data-key="8">8</button>
+        <button class="numkey" data-key="9">9</button>
+        <button class="numkey" data-key=".">.</button>
+        <button class="numkey" data-key="0">0</button>
+        <button class="numkey" data-key="backspace">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00f5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+            <line x1="18" y1="9" x2="12" y2="15"/>
+            <line x1="12" y1="9" x2="18" y2="15"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tip -->
+    <div class="tip-section">
+      <span class="section-label">TIP PROTOCOL</span>
+      <div class="tip-row">
+        <button class="tip-btn" data-tip="10">10%</button>
+        <button class="tip-btn" data-tip="15">15%</button>
+        <button class="tip-btn active" data-tip="18">18%</button>
+        <button class="tip-btn" data-tip="20">20%</button>
+        <button class="tip-btn" data-tip="25">25%</button>
+      </div>
+      <div class="custom-row">
+        <button id="custom-toggle">CUSTOM %</button>
+        <div id="custom-slider-wrap">
+          <input type="range" id="custom-slider" min="0" max="40" value="18" />
+          <span id="custom-val">18%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Split -->
+    <div class="split-section">
+      <span class="section-label">SPLIT PROTOCOL</span>
+      <div class="split-row">
+        <button class="split-btn" id="split-minus">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="split-center">
+          <span id="split-display">1</span><span id="split-label">UNIT</span>
+        </div>
+        <button class="split-btn" id="split-plus">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section">
+      <div class="result-orb">
+        <svg width="40" height="40" viewBox="0 0 40 40" style="animation:orbPulse 2s ease-in-out infinite;">
+          <defs>
+            <radialGradient id="og2" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#00f5ff" stop-opacity="0.9"/>
+              <stop offset="60%" stop-color="#0070ff" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#7b2fff" stop-opacity="0.1"/>
+            </radialGradient>
+          </defs>
+          <circle cx="20" cy="20" r="10" fill="url(#og2)"/>
+        </svg>
+      </div>
+      <span class="result-label" style="color:rgba(0,245,255,0.6);">TIP AMOUNT</span>
+      <div id="result-tip" class="result-value value-display" style="font-size:30px;color:var(--cyan);text-shadow:0 0 16px rgba(0,245,255,0.5);">$0.00</div>
+      <div class="neon-divider"></div>
+      <span class="result-label" style="color:rgba(0,245,255,0.6);">TOTAL</span>
+      <div id="result-total" class="result-value value-display" style="font-size:38px;color:var(--text);text-shadow:0 0 16px rgba(232,244,255,0.4);">$0.00</div>
+      <div class="neon-divider"></div>
+      <span class="result-label" style="color:rgba(123,47,255,0.7);">PER UNIT</span>
+      <div id="result-per" class="result-value value-display" style="font-size:30px;color:var(--violet);text-shadow:0 0 16px rgba(123,47,255,0.5);">$0.00</div>
+    </div>
+
+    <button id="reset-btn">RESET SYSTEM</button>
+
+    <footer><p class="footer-text">OROZCO TIP CALCULATOR</p></footer>
+  </div>
+
+  <script>
+    let billStr = "";
+    let tipPercent = 18;
+    let splitCount = 1;
+    let customMode = false;
+    let animFrameIds = {};
+    let prevTip = 0, prevTotal = 0, prevPer = 0;
+
+    const billDisplay = document.getElementById("bill-display");
+    const resultTip = document.getElementById("result-tip");
+    const resultTotal = document.getElementById("result-total");
+    const resultPer = document.getElementById("result-per");
+    const splitDisplay = document.getElementById("split-display");
+    const splitLabel = document.getElementById("split-label");
+    const customSliderWrap = document.getElementById("custom-slider-wrap");
+    const customSlider = document.getElementById("custom-slider");
+    const customVal = document.getElementById("custom-val");
+
+    function fmtCurrency(val) { return "$" + val.toFixed(2); }
+
+    function updateBillDisplay() {
+      if (billStr === "") { billDisplay.textContent = "$0.00"; return; }
+      const num = parseFloat(billStr) || 0;
+      if (billStr.endsWith(".") || (billStr.includes(".") && billStr.split(".")[1].length < 2)) {
+        billDisplay.textContent = "$" + billStr;
+      } else {
+        billDisplay.textContent = fmtCurrency(num);
+      }
+    }
+
+    function animateValue(element, start, end, duration, prefix) {
+      const key = element.id;
+      if (animFrameIds[key]) cancelAnimationFrame(animFrameIds[key]);
+      const startTime = performance.now();
+      function tick(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - (1 - progress) * (1 - progress);
+        element.textContent = prefix + (start + (end - start) * ease).toFixed(2);
+        if (progress < 1) animFrameIds[key] = requestAnimationFrame(tick);
+      }
+      animFrameIds[key] = requestAnimationFrame(tick);
+    }
+
+    function calculate() {
+      const bill = parseFloat(billStr) || 0;
+      const tip = bill * (tipPercent / 100);
+      const total = bill + tip;
+      const per = splitCount > 0 ? total / splitCount : total;
+      animateValue(resultTip, prevTip, tip, 300, "$");
+      animateValue(resultTotal, prevTotal, total, 300, "$");
+      animateValue(resultPer, prevPer, per, 300, "$");
+      prevTip = tip; prevTotal = total; prevPer = per;
+    }
+
+    document.querySelectorAll(".numkey").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        const key = this.dataset.key;
+        this.classList.remove("key-flash");
+        void this.offsetWidth;
+        this.classList.add("key-flash");
+        if (key === "backspace") {
+          billStr = billStr.slice(0, -1);
+        } else if (key === ".") {
+          if (billStr.includes(".")) return;
+          if (billStr === "") billStr = "0";
+          billStr += ".";
+        } else {
+          if (billStr.includes(".") && billStr.split(".")[1].length >= 2) return;
+          if (billStr.replace(".", "").length >= 7) return;
+          billStr += key;
+        }
+        updateBillDisplay();
+        calculate();
+      });
+    });
+
+    document.querySelectorAll(".tip-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        if (customMode) {
+          customMode = false;
+          customSliderWrap.classList.remove("visible");
+          document.getElementById("custom-toggle").style.borderColor = "rgba(0,245,255,0.25)";
+          document.getElementById("custom-toggle").style.background = "rgba(0,245,255,0.05)";
+        }
+        document.querySelectorAll(".tip-btn").forEach(function(b) { b.classList.remove("active"); });
+        this.classList.add("active");
+        tipPercent = parseInt(this.dataset.tip);
+        calculate();
+      });
+    });
+
+    document.getElementById("custom-toggle").addEventListener("click", function() {
+      customMode = !customMode;
+      if (customMode) {
+        customSliderWrap.classList.add("visible");
+        this.style.borderColor = "var(--cyan)";
+        this.style.background = "rgba(0,245,255,0.15)";
+        document.querySelectorAll(".tip-btn").forEach(function(b) { b.classList.remove("active"); });
+        tipPercent = parseInt(customSlider.value);
+      } else {
+        customSliderWrap.classList.remove("visible");
+        this.style.borderColor = "rgba(0,245,255,0.25)";
+        this.style.background = "rgba(0,245,255,0.05)";
+        tipPercent = 18;
+        document.querySelectorAll(".tip-btn").forEach(function(b) {
+          if (b.dataset.tip === "18") b.classList.add("active");
+        });
+      }
+      calculate();
+    });
+
+    customSlider.addEventListener("input", function() {
+      tipPercent = parseInt(this.value);
+      customVal.textContent = tipPercent + "%";
+      calculate();
+    });
+
+    document.getElementById("split-minus").addEventListener("click", function() {
+      if (splitCount > 1) {
+        splitCount--;
+        splitDisplay.textContent = splitCount;
+        splitLabel.textContent = splitCount === 1 ? "UNIT" : "UNITS";
+        calculate();
+      }
+    });
+
+    document.getElementById("split-plus").addEventListener("click", function() {
+      if (splitCount < 20) {
+        splitCount++;
+        splitDisplay.textContent = splitCount;
+        splitLabel.textContent = splitCount === 1 ? "UNIT" : "UNITS";
+        calculate();
+      }
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", function() {
+      billStr = ""; tipPercent = 18; splitCount = 1; customMode = false;
+      prevTip = 0; prevTotal = 0; prevPer = 0;
+      updateBillDisplay();
+      resultTip.textContent = "$0.00";
+      resultTotal.textContent = "$0.00";
+      resultPer.textContent = "$0.00";
+      splitDisplay.textContent = "1";
+      splitLabel.textContent = "UNIT";
+      document.querySelectorAll(".tip-btn").forEach(function(b) {
+        b.classList.remove("active");
+        if (b.dataset.tip === "18") b.classList.add("active");
+      });
+      customSliderWrap.classList.remove("visible");
+      customSlider.value = 18;
+      customVal.textContent = "18%";
+      document.getElementById("custom-toggle").style.borderColor = "rgba(0,245,255,0.25)";
+      document.getElementById("custom-toggle").style.background = "rgba(0,245,255,0.05)";
+    });
+  </script>
+</body>
+</html>
